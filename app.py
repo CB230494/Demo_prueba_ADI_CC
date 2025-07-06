@@ -231,7 +231,7 @@ if menu == "💵 Pagos":
                         self.set_font("Arial", "B", 16)
                         self.cell(0, 12, "Asociación de Desarrollo Integral de Colonia Carvajal", ln=True, align="C")
                         self.set_font("Arial", "", 12)
-                        self.cell(0, 10, "Factura por pago de servicio de agua potable", ln=True, align="C")
+                        self.cell(0, 10, "Comprobante por pago de servicio de agua potable", ln=True, align="C")
                         self.ln(10)
 
                     def footer(self):
