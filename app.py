@@ -132,11 +132,11 @@ if menu == "💵 Pagos":
             if not mes_pagado or not imagen:
                 st.warning("Debes ingresar todos los datos y subir el comprobante.")
             else:
-                # Registrar pago
+                # ✅ Registrar pago (con fecha en formato ISO)
                 supabase.table("pagos").insert({
                     "abonado_id": id_abonado,
                     "mes_pagado": mes_pagado,
-                    "fecha_pago": fecha_pago,
+                    "fecha_pago": fecha_pago.isoformat(),
                     "estado_pago": "al día"
                 }).execute()
 
@@ -165,7 +165,6 @@ if menu == "💵 Pagos":
                 pdf.cell(0, 10, f"Mes pagado: {mes_pagado}", ln=True)
                 pdf.cell(0, 10, f"Fecha de pago: {fecha_pago.strftime('%d/%m/%Y')}", ln=True)
 
-                # Guardar imagen temporal
                 img_buffer = BytesIO()
                 image.save(img_buffer, format="PNG")
                 img_buffer.seek(0)
@@ -223,4 +222,5 @@ if menu == "📤 Respaldo":
             file_name="respaldo_acueducto.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
 
