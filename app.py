@@ -143,7 +143,7 @@ if menu == "💵 Pagos":
 
                 class FacturaPDF(FPDF):
                     def header(self):
-                        self.set_fill_color(230, 240, 255)
+                        self.set_fill_color(220, 230, 255)  # azul claro
                         self.set_text_color(0)
                         self.set_font("Arial", "B", 16)
                         self.cell(0, 12, "Asociación de Desarrollo Integral de Colonia Carvajal", ln=True, align="C")
@@ -158,7 +158,7 @@ if menu == "💵 Pagos":
                         self.cell(0, 10, f"Página {self.page_no()} - Acueducto ADI Colonia Carvajal", 0, 0, "C")
 
                     def watermark(self, text):
-                        self.set_text_color(200, 200, 200)
+                        self.set_text_color(240, 240, 240)
                         self.set_font("Arial", "B", 40)
                         self.rotate(45, x=self.w/2, y=self.h/2)
                         self.text(x=30, y=self.h/2, txt=text)
@@ -185,28 +185,30 @@ if menu == "💵 Pagos":
                 pdf.watermark("ADI Colonia Carvajal")
 
                 pdf.set_font("Arial", "B", 12)
-                pdf.set_fill_color(240, 240, 240)
-                pdf.set_text_color(0)
+
+                # Encabezado visual con borde rojo
+                pdf.set_draw_color(200, 0, 0)  # rojo
+                pdf.set_fill_color(230, 255, 230)  # verde claro
 
                 pdf.cell(50, 10, "Abonado:", 1, 0, "L", 1)
-                pdf.cell(130, 10, abonado_seleccionado, 1, 1, "L")
+                pdf.cell(130, 10, abonado_seleccionado, 1, 1, "L", 0)
 
                 pdf.cell(50, 10, "Mes pagado:", 1, 0, "L", 1)
-                pdf.cell(130, 10, mes_pagado, 1, 1, "L")
+                pdf.cell(130, 10, mes_pagado, 1, 1, "L", 0)
 
                 pdf.cell(50, 10, "Fecha de pago:", 1, 0, "L", 1)
-                pdf.cell(130, 10, fecha_pago.strftime('%d/%m/%Y'), 1, 1, "L")
+                pdf.cell(130, 10, fecha_pago.strftime('%d/%m/%Y'), 1, 1, "L", 0)
 
                 pdf.ln(10)
                 pdf.set_font("Arial", "B", 12)
-                pdf.set_text_color(50, 50, 50)
-                pdf.cell(0, 10, "Pantallazo SINPE:", ln=True)
+                pdf.set_text_color(0, 102, 204)  # azul fuerte
+                pdf.cell(0, 10, "Prueba de Pago:", ln=True)
 
                 img_buffer = BytesIO()
                 image_obj.save(img_buffer, format="PNG")
                 img_buffer.seek(0)
 
-                pdf.image(img_buffer, x=30, y=pdf.get_y() + 5, w=150)
+                pdf.image(img_buffer, x=55, y=pdf.get_y() + 5, w=100)  # imagen más pequeña y centrada
 
                 pdf_output = BytesIO()
                 pdf.output(pdf_output)
