@@ -69,38 +69,46 @@ if menu == "👥 Gestión de Abonados":
     else:
         df_abonados = pd.DataFrame(abonados_data.data)
 
-        # Obtener mes anterior al actual
+        # Obtener mes anterior al actual (solo si aplica)
+        meses_inicio = ["Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+        año_inicio = 2025
         hoy = date.today()
-        if hoy.month == 1:
-            mes_anterior = f"Diciembre {hoy.year - 1}"
-        else:
-            mes_anterior = f"{month_name[hoy.month - 1]} {hoy.year}"
 
-        # Consultar pagos de todos los abonados
+        if hoy.year == año_inicio and hoy.strftime("%B") in meses_inicio:
+            mes_anterior = None
+        else:
+            if hoy.month == 1:
+                mes_anterior = f"Diciembre {hoy.year - 1}"
+            else:
+                # Si usas meses en español, ajusta aquí también
+                meses_es = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+                mes_anterior = f"{meses_es[hoy.month - 2]} {hoy.year}"
+
+        # Consultar pagos
         pagos = supabase.table("pagos").select("abonado_id", "mes_pagado").execute().data
         df_pagos = pd.DataFrame(pagos)
 
-        # Calcular estado de cada abonado
+        # Calcular estado
         estados = {}
         for _, row in df_abonados.iterrows():
             abonado_id = row["id"]
             pagos_abonado = df_pagos[df_pagos["abonado_id"] == abonado_id]["mes_pagado"].tolist()
-            if mes_anterior in pagos_abonado:
+            if mes_anterior and mes_anterior in pagos_abonado:
                 estados[abonado_id] = "al día"
-            else:
+            elif mes_anterior:
                 estados[abonado_id] = "moroso"
+            else:
+                estados[abonado_id] = "al día"
 
-        # Agregar columna de estado al DataFrame
         df_abonados["Estado"] = df_abonados["id"].map(estados)
 
-        # Mostrar selector
         abonado_seleccionado = st.selectbox(
             "Selecciona un abonado para gestionar:",
             df_abonados["numero_abonado"].astype(str) + " - " + df_abonados["nombre_completo"],
             index=0
         )
 
-        # Obtener ID real del abonado
         seleccionado_id = df_abonados.loc[
             df_abonados["numero_abonado"].astype(str) + " - " + df_abonados["nombre_completo"] == abonado_seleccionado,
             "id"
@@ -108,7 +116,6 @@ if menu == "👥 Gestión de Abonados":
 
         datos_abonado = df_abonados[df_abonados["id"] == seleccionado_id].iloc[0]
 
-        # Mostrar estado
         st.markdown(f"**Estado actual del abonado:** {'🟢 al día' if datos_abonado['Estado'] == 'al día' else '🔴 moroso'}")
 
         st.write("### Editar Información")
@@ -137,6 +144,36 @@ if menu == "👥 Gestión de Abonados":
                     supabase.table("abonados").delete().eq("id", seleccionado_id).execute()
                     st.success("✅ Abonado eliminado.")
                     st.experimental_rerun()
+
+        # ---------- GESTIÓN DE PAGOS DEL ABONADO ----------
+        st.write("### Pagos registrados de este abonado")
+
+        pagos_abonado = supabase.table("pagos").select("*").eq("abonado_id", seleccionado_id).order("fecha_pago", desc=False).execute().data
+
+        if not pagos_abonado:
+            st.info("Este abonado aún no tiene pagos registrados.")
+        else:
+            for pago in pagos_abonado:
+                col1, col2, col3 = st.columns([3, 3, 1])
+                with col1:
+                    st.write(f"🗓️ Mes pagado: **{pago['mes_pagado']}**")
+                    st.write(f"📅 Fecha: {pago['fecha_pago']}")
+                with col2:
+                    nueva_fecha = st.date_input(
+                        f"Editar fecha ({pago['mes_pagado']})",
+                        value=pd.to_datetime(pago["fecha_pago"]),
+                        key=f"f{pago['id']}"
+                    )
+                    if st.button("💾 Guardar cambio de fecha", key=f"edit_{pago['id']}"):
+                        supabase.table("pagos").update({"fecha_pago": nueva_fecha.isoformat()}).eq("id", pago["id"]).execute()
+                        st.success("Fecha actualizada correctamente.")
+                        st.experimental_rerun()
+                with col3:
+                    if st.button("🗑️ Eliminar", key=f"del_{pago['id']}"):
+                        supabase.table("pagos").delete().eq("id", pago["id"]).execute()
+                        st.success("Pago eliminado.")
+                        st.experimental_rerun()
+
 # ---------- PESTAÑA: PAGOS ----------
 if menu == "💵 Pagos":
     st.subheader("Registrar Pago de Abonado")
