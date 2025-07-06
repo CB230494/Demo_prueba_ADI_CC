@@ -174,8 +174,6 @@ if menu == "💵 Pagos":
                         if y is None:
                             y = self.y
                         self._out(f'q {c:.5f} {s:.5f} {-s:.5f} {c:.5f} {x:.2f} {y:.2f} cm')
-
-                        # Restore on next page or end of rotation
                         self._out('Q')
 
                 image_obj = Image.open(imagen)
@@ -185,8 +183,6 @@ if menu == "💵 Pagos":
                 pdf.watermark("ADI Colonia Carvajal")
 
                 pdf.set_font("Arial", "B", 12)
-
-                # Tabla de datos del abonado
                 pdf.set_draw_color(200, 0, 0)       # borde rojo
                 pdf.set_fill_color(220, 255, 220)   # verde claro
                 pdf.set_text_color(0, 0, 0)         # texto negro
@@ -208,8 +204,7 @@ if menu == "💵 Pagos":
                 img_buffer = BytesIO()
                 image_obj.save(img_buffer, format="PNG")
                 img_buffer.seek(0)
-
-                pdf.image(img_buffer, x=55, y=pdf.get_y() + 5, w=100)  # imagen centrada y más pequeña
+                pdf.image(img_buffer, x=55, y=pdf.get_y() + 5, w=100)
 
                 pdf_output = BytesIO()
                 pdf.output(pdf_output)
@@ -235,12 +230,29 @@ if menu == "📤 Respaldo":
         df_abonados = pd.DataFrame(abonados)
         df_pagos = pd.DataFrame(pagos)
 
-        df_abonados.rename(columns={
+        # Conversión de fechas
+        df_abonados["creado_en"] = pd.to_datetime(df_abonados["creado_en"])
+        fecha_min = df_abonados["creado_en"].min().date()
+        fecha_max = df_abonados["creado_en"].max().date()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            desde = st.date_input("📅 Mostrar abonados registrados desde:", value=fecha_min, min_value=fecha_min, max_value=fecha_max)
+        with col2:
+            hasta = st.date_input("📅 Hasta:", value=fecha_max, min_value=fecha_min, max_value=fecha_max)
+
+        mask = (df_abonados["creado_en"].dt.date >= desde) & (df_abonados["creado_en"].dt.date <= hasta)
+        df_abonados_filtrado = df_abonados[mask].copy()
+
+        df_abonados_filtrado.rename(columns={
             "numero_abonado": "Número de Abonado",
             "cedula": "Cédula",
             "nombre_completo": "Nombre",
-            "creado_en": "Registrado En"
+            "creado_en": "Registrado El"
         }, inplace=True)
+
+        # Formatear fecha
+        df_abonados_filtrado["Registrado El"] = df_abonados_filtrado["Registrado El"].dt.strftime("%d/%m/%Y")
 
         df_pagos.rename(columns={
             "mes_pagado": "Mes Pagado",
@@ -251,7 +263,7 @@ if menu == "📤 Respaldo":
 
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df_abonados.to_excel(writer, sheet_name="Abonados", index=False)
+            df_abonados_filtrado.to_excel(writer, sheet_name="Abonados", index=False)
             df_pagos.to_excel(writer, sheet_name="Pagos", index=False)
 
         output.seek(0)
@@ -262,4 +274,5 @@ if menu == "📤 Respaldo":
             file_name="respaldo_acueducto.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
 
