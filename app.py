@@ -4,7 +4,8 @@ import pandas as pd
 from fpdf import FPDF
 from PIL import Image
 from io import BytesIO
-from datetime import date
+from datetime import date, datetime
+from calendar import month_name
 import base64
 
 # ---------- CONFIGURACIÓN INICIAL ----------
@@ -28,6 +29,7 @@ menu = st.sidebar.radio(
     "Selecciona una pestaña",
     ["➕ Agregar Abonado", "👥 Gestión de Abonados", "💵 Pagos", "📤 Respaldo"]
 )
+
 # ---------- PESTAÑA: AGREGAR ABONADO ----------
 if menu == "➕ Agregar Abonado":
     st.subheader("Registro de nuevo abonado")
@@ -40,16 +42,13 @@ if menu == "➕ Agregar Abonado":
         submitted = st.form_submit_button("Registrar Abonado")
 
         if submitted:
-            # Validar campos obligatorios
             if not cedula or not nombre_completo:
                 st.warning("⚠️ Todos los campos son obligatorios.")
             else:
-                # Verificar que no exista ya el número de abonado
                 existing = supabase.table("abonados").select("*").eq("numero_abonado", numero_abonado).execute()
                 if existing.data:
                     st.error(f"Ya existe un abonado con el número {numero_abonado}.")
                 else:
-                    # Insertar nuevo abonado
                     result = supabase.table("abonados").insert({
                         "numero_abonado": numero_abonado,
                         "cedula": cedula,
@@ -69,8 +68,32 @@ if menu == "👥 Gestión de Abonados":
         st.info("No hay abonados registrados.")
     else:
         df_abonados = pd.DataFrame(abonados_data.data)
-        df_abonados["Acción"] = ""
 
+        # Obtener mes anterior al actual
+        hoy = date.today()
+        if hoy.month == 1:
+            mes_anterior = f"Diciembre {hoy.year - 1}"
+        else:
+            mes_anterior = f"{month_name[hoy.month - 1]} {hoy.year}"
+
+        # Consultar pagos de todos los abonados
+        pagos = supabase.table("pagos").select("abonado_id", "mes_pagado").execute().data
+        df_pagos = pd.DataFrame(pagos)
+
+        # Calcular estado de cada abonado
+        estados = {}
+        for _, row in df_abonados.iterrows():
+            abonado_id = row["id"]
+            pagos_abonado = df_pagos[df_pagos["abonado_id"] == abonado_id]["mes_pagado"].tolist()
+            if mes_anterior in pagos_abonado:
+                estados[abonado_id] = "al día"
+            else:
+                estados[abonado_id] = "moroso"
+
+        # Agregar columna de estado al DataFrame
+        df_abonados["Estado"] = df_abonados["id"].map(estados)
+
+        # Mostrar selector
         abonado_seleccionado = st.selectbox(
             "Selecciona un abonado para gestionar:",
             df_abonados["numero_abonado"].astype(str) + " - " + df_abonados["nombre_completo"],
@@ -84,6 +107,9 @@ if menu == "👥 Gestión de Abonados":
         ].values[0]
 
         datos_abonado = df_abonados[df_abonados["id"] == seleccionado_id].iloc[0]
+
+        # Mostrar estado
+        st.markdown(f"**Estado actual del abonado:** {'🟢 al día' if datos_abonado['Estado'] == 'al día' else '🔴 moroso'}")
 
         st.write("### Editar Información")
         nuevo_numero = st.number_input("Número de Abonado", value=datos_abonado["numero_abonado"], step=1)
@@ -123,24 +149,39 @@ if menu == "💵 Pagos":
         abonado_seleccionado = st.selectbox("Selecciona un abonado", list(abonado_dict.keys()))
         id_abonado = abonado_dict[abonado_seleccionado]
 
-        mes_pagado = st.text_input("Mes o meses pagados (Ej: Julio 2025)")
+        # ----------- NUEVA LÓGICA DE MESES DISPONIBLES -----------
+        año_actual = date.today().year
+        todos_los_meses = [f"{month_name[i]} {año_actual}" for i in range(1, 13)]
+
+        pagos_existentes = supabase.table("pagos").select("mes_pagado").eq("abonado_id", id_abonado).execute().data
+        meses_ya_pagados = [p["mes_pagado"] for p in pagos_existentes]
+        meses_disponibles = [m for m in todos_los_meses if m not in meses_ya_pagados]
+
+        meses_seleccionados = st.multiselect(
+            "Selecciona el/los meses a pagar",
+            options=meses_disponibles
+        )
+
         fecha_pago = st.date_input("Fecha de pago", value=date.today())
         imagen = st.file_uploader("Pantallazo del SINPE (imagen JPG o PNG)", type=["png", "jpg", "jpeg"])
 
         if st.button("💾 Registrar Pago y Generar Factura"):
-            if not mes_pagado or not imagen:
-                st.warning("Debes ingresar todos los datos y subir el comprobante.")
+            if not meses_seleccionados or not imagen:
+                st.warning("Debes seleccionar al menos un mes y subir el comprobante.")
             else:
-                supabase.table("pagos").insert({
-                    "abonado_id": id_abonado,
-                    "mes_pagado": mes_pagado,
-                    "fecha_pago": fecha_pago.isoformat(),
-                    "estado_pago": "al día"
-                }).execute()
+                # Registrar cada mes como pago individual
+                for mes in meses_seleccionados:
+                    supabase.table("pagos").insert({
+                        "abonado_id": id_abonado,
+                        "mes_pagado": mes,
+                        "fecha_pago": fecha_pago.isoformat(),
+                        "estado_pago": "al día"
+                    }).execute()
 
                 st.success("✅ Pago registrado.")
                 st.subheader("📄 Factura generada")
 
+                from fpdf import FPDF
                 class FacturaPDF(FPDF):
                     def header(self):
                         self.set_fill_color(220, 230, 255)
@@ -190,8 +231,8 @@ if menu == "💵 Pagos":
                 pdf.cell(50, 10, "Abonado:", 1, 0, "L", 1)
                 pdf.cell(130, 10, abonado_seleccionado, 1, 1, "L")
 
-                pdf.cell(50, 10, "Mes pagado:", 1, 0, "L", 1)
-                pdf.cell(130, 10, mes_pagado, 1, 1, "L")
+                pdf.cell(50, 10, "Mes(es) pagado(s):", 1, 0, "L", 1)
+                pdf.cell(130, 10, ", ".join(meses_seleccionados), 1, 1, "L")
 
                 pdf.cell(50, 10, "Fecha de pago:", 1, 0, "L", 1)
                 pdf.cell(130, 10, fecha_pago.strftime('%d/%m/%Y'), 1, 1, "L")
@@ -216,7 +257,6 @@ if menu == "💵 Pagos":
                     file_name=f"factura_{abonado_seleccionado.replace(' ', '_')}.pdf",
                     mime="application/pdf"
                 )
-
 # ---------- PESTAÑA: RESPALDO ----------
 if menu == "📤 Respaldo":
     st.subheader("📦 Descargar respaldo en Excel")
@@ -252,11 +292,15 @@ if menu == "📤 Respaldo":
 
         df_abonados_filtrado["Registrado El"] = df_abonados_filtrado["Registrado El"].dt.strftime("%d/%m/%Y")
 
-        # Agrupar pagos por abonado y obtener meses
+        # Agrupar pagos por abonado sin duplicados
         df_pagos_df = pd.DataFrame(pagos)
-        pagos_por_abonado = df_pagos_df.groupby("abonado_id")["mes_pagado"].apply(lambda x: ", ".join(x)).to_dict()
-        df_abonados_filtrado["Meses Pagados"] = df_abonados_filtrado["id"].map(pagos_por_abonado).fillna("")
+        pagos_por_abonado = (
+            df_pagos_df.groupby("abonado_id")["mes_pagado"]
+            .apply(lambda x: ", ".join(sorted(set(x))))
+            .to_dict()
+        )
 
+        df_abonados_filtrado["Meses Pagados"] = df_abonados_filtrado["id"].map(pagos_por_abonado).fillna("")
         df_abonados_filtrado.drop(columns=["id"], inplace=True)
 
         df_pagos.rename(columns={
