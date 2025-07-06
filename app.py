@@ -84,13 +84,20 @@ if menu == "👥 Gestión de Abonados":
                             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
                 mes_anterior = f"{meses_es[hoy.month - 2]} {hoy.year}"
 
+        # Obtener pagos y construir DataFrame seguro
         pagos = supabase.table("pagos").select("abonado_id", "mes_pagado").execute().data
         df_pagos = pd.DataFrame(pagos)
 
         estados = {}
+
         for _, row in df_abonados.iterrows():
             abonado_id = row["id"]
-            pagos_abonado = df_pagos[df_pagos["abonado_id"] == abonado_id]["mes_pagado"].tolist()
+
+            if not df_pagos.empty and "abonado_id" in df_pagos.columns and "mes_pagado" in df_pagos.columns:
+                pagos_abonado = df_pagos[df_pagos["abonado_id"] == abonado_id]["mes_pagado"].tolist()
+            else:
+                pagos_abonado = []
+
             if mes_anterior and mes_anterior in pagos_abonado:
                 estados[abonado_id] = "al día"
             elif mes_anterior:
