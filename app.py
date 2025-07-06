@@ -143,7 +143,7 @@ if menu == "💵 Pagos":
 
                 class FacturaPDF(FPDF):
                     def header(self):
-                        self.set_fill_color(220, 230, 255)  # azul claro
+                        self.set_fill_color(220, 230, 255)
                         self.set_text_color(0)
                         self.set_font("Arial", "B", 16)
                         self.cell(0, 12, "Asociación de Desarrollo Integral de Colonia Carvajal", ln=True, align="C")
@@ -183,9 +183,9 @@ if menu == "💵 Pagos":
                 pdf.watermark("ADI Colonia Carvajal")
 
                 pdf.set_font("Arial", "B", 12)
-                pdf.set_draw_color(200, 0, 0)       # borde rojo
-                pdf.set_fill_color(220, 255, 220)   # verde claro
-                pdf.set_text_color(0, 0, 0)         # texto negro
+                pdf.set_draw_color(200, 0, 0)
+                pdf.set_fill_color(220, 255, 220)
+                pdf.set_text_color(0, 0, 0)
 
                 pdf.cell(50, 10, "Abonado:", 1, 0, "L", 1)
                 pdf.cell(130, 10, abonado_seleccionado, 1, 1, "L")
@@ -198,7 +198,7 @@ if menu == "💵 Pagos":
 
                 pdf.ln(10)
                 pdf.set_font("Arial", "B", 12)
-                pdf.set_text_color(0, 102, 204)  # azul fuerte
+                pdf.set_text_color(0, 102, 204)
                 pdf.cell(0, 10, "Prueba de Pago:", ln=True)
 
                 img_buffer = BytesIO()
@@ -230,7 +230,6 @@ if menu == "📤 Respaldo":
         df_abonados = pd.DataFrame(abonados)
         df_pagos = pd.DataFrame(pagos)
 
-        # Conversión de fechas
         df_abonados["creado_en"] = pd.to_datetime(df_abonados["creado_en"])
         fecha_min = df_abonados["creado_en"].min().date()
         fecha_max = df_abonados["creado_en"].max().date()
@@ -251,8 +250,14 @@ if menu == "📤 Respaldo":
             "creado_en": "Registrado El"
         }, inplace=True)
 
-        # Formatear fecha
         df_abonados_filtrado["Registrado El"] = df_abonados_filtrado["Registrado El"].dt.strftime("%d/%m/%Y")
+
+        # Agrupar pagos por abonado y obtener meses
+        df_pagos_df = pd.DataFrame(pagos)
+        pagos_por_abonado = df_pagos_df.groupby("abonado_id")["mes_pagado"].apply(lambda x: ", ".join(x)).to_dict()
+        df_abonados_filtrado["Meses Pagados"] = df_abonados_filtrado["id"].map(pagos_por_abonado).fillna("")
+
+        df_abonados_filtrado.drop(columns=["id"], inplace=True)
 
         df_pagos.rename(columns={
             "mes_pagado": "Mes Pagado",
@@ -274,5 +279,6 @@ if menu == "📤 Respaldo":
             file_name="respaldo_acueducto.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
 
 
