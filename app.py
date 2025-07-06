@@ -115,7 +115,6 @@ if menu == "👥 Gestión de Abonados":
 if menu == "💵 Pagos":
     st.subheader("Registrar Pago de Abonado")
 
-    # Cargar abonados
     abonados = supabase.table("abonados").select("*").order("numero_abonado", desc=False).execute().data
     if not abonados:
         st.info("Primero debes registrar abonados.")
@@ -132,7 +131,6 @@ if menu == "💵 Pagos":
             if not mes_pagado or not imagen:
                 st.warning("Debes ingresar todos los datos y subir el comprobante.")
             else:
-                # ✅ Registrar pago (con fecha en formato ISO)
                 supabase.table("pagos").insert({
                     "abonado_id": id_abonado,
                     "mes_pagado": mes_pagado,
@@ -141,35 +139,74 @@ if menu == "💵 Pagos":
                 }).execute()
 
                 st.success("✅ Pago registrado.")
-
-                # Mostrar PDF generado
                 st.subheader("📄 Factura generada")
 
-                image = Image.open(imagen)
+                class FacturaPDF(FPDF):
+                    def header(self):
+                        self.set_fill_color(230, 240, 255)
+                        self.set_text_color(0)
+                        self.set_font("Arial", "B", 16)
+                        self.cell(0, 12, "Asociación de Desarrollo Integral de Colonia Carvajal", ln=True, align="C")
+                        self.set_font("Arial", "", 12)
+                        self.cell(0, 10, "Factura por pago de servicio de agua potable", ln=True, align="C")
+                        self.ln(10)
 
-                pdf = FPDF()
+                    def footer(self):
+                        self.set_y(-15)
+                        self.set_font("Arial", "I", 10)
+                        self.set_text_color(100)
+                        self.cell(0, 10, f"Página {self.page_no()} - Acueducto ADI Colonia Carvajal", 0, 0, "C")
+
+                    def watermark(self, text):
+                        self.set_text_color(200, 200, 200)
+                        self.set_font("Arial", "B", 40)
+                        self.rotate(45, x=self.w/2, y=self.h/2)
+                        self.text(x=30, y=self.h/2, txt=text)
+                        self.rotate(0)
+
+                    def rotate(self, angle, x=None, y=None):
+                        from math import cos, sin, radians
+                        angle = radians(angle)
+                        c = cos(angle)
+                        s = sin(angle)
+                        if x is None:
+                            x = self.x
+                        if y is None:
+                            y = self.y
+                        self._out(f'q {c:.5f} {s:.5f} {-s:.5f} {c:.5f} {x:.2f} {y:.2f} cm')
+
+                        # Restore on next page or end of rotation
+                        self._out('Q')
+
+                image_obj = Image.open(imagen)
+
+                pdf = FacturaPDF()
                 pdf.add_page()
-                pdf.set_font("Arial", "B", 14)
+                pdf.watermark("ADI Colonia Carvajal")
 
-                # Marca de agua
-                pdf.set_text_color(230, 230, 230)
-                for y in range(30, 280, 50):
-                    pdf.set_xy(30, y)
-                    pdf.cell(0, 10, "ADI Colonia Carvajal", 0, 0, 'C')
+                pdf.set_font("Arial", "B", 12)
+                pdf.set_fill_color(240, 240, 240)
+                pdf.set_text_color(0)
 
-                pdf.set_text_color(0, 0, 0)
-                pdf.set_xy(10, 20)
-                pdf.cell(0, 10, "Asociación de Desarrollo Integral de Colonia Carvajal", ln=True)
-                pdf.set_font("Arial", "", 12)
-                pdf.cell(0, 10, f"Abonado: {abonado_seleccionado}", ln=True)
-                pdf.cell(0, 10, f"Mes pagado: {mes_pagado}", ln=True)
-                pdf.cell(0, 10, f"Fecha de pago: {fecha_pago.strftime('%d/%m/%Y')}", ln=True)
+                pdf.cell(50, 10, "Abonado:", 1, 0, "L", 1)
+                pdf.cell(130, 10, abonado_seleccionado, 1, 1, "L")
+
+                pdf.cell(50, 10, "Mes pagado:", 1, 0, "L", 1)
+                pdf.cell(130, 10, mes_pagado, 1, 1, "L")
+
+                pdf.cell(50, 10, "Fecha de pago:", 1, 0, "L", 1)
+                pdf.cell(130, 10, fecha_pago.strftime('%d/%m/%Y'), 1, 1, "L")
+
+                pdf.ln(10)
+                pdf.set_font("Arial", "B", 12)
+                pdf.set_text_color(50, 50, 50)
+                pdf.cell(0, 10, "Pantallazo SINPE:", ln=True)
 
                 img_buffer = BytesIO()
-                image.save(img_buffer, format="PNG")
+                image_obj.save(img_buffer, format="PNG")
                 img_buffer.seek(0)
 
-                pdf.image(img_buffer, x=30, y=90, w=150)
+                pdf.image(img_buffer, x=30, y=pdf.get_y() + 5, w=150)
 
                 pdf_output = BytesIO()
                 pdf.output(pdf_output)
