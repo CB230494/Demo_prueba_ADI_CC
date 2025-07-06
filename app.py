@@ -69,13 +69,10 @@ if menu == "👥 Gestión de Abonados":
     else:
         df_abonados = pd.DataFrame(abonados_data.data)
 
-        # Calcular mes anterior si ya aplica
-        meses_inicio = ["Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-        año_inicio = 2025
+        # Obtener mes anterior SOLO si ya estamos en agosto 2025 o más
         hoy = date.today()
-
-        if hoy.year == año_inicio and hoy.strftime("%B") in meses_inicio:
-            mes_anterior = None
+        if hoy.year == 2025 and hoy.month <= 7:
+            mes_anterior = None  # No aplicar morosidad antes/agosto 2025
         else:
             if hoy.month == 1:
                 mes_anterior = f"Diciembre {hoy.year - 1}"
@@ -84,12 +81,11 @@ if menu == "👥 Gestión de Abonados":
                             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
                 mes_anterior = f"{meses_es[hoy.month - 2]} {hoy.year}"
 
-        # Obtener pagos y construir DataFrame seguro
+        # Obtener pagos desde Supabase
         pagos = supabase.table("pagos").select("abonado_id", "mes_pagado").execute().data
         df_pagos = pd.DataFrame(pagos)
 
         estados = {}
-
         for _, row in df_abonados.iterrows():
             abonado_id = row["id"]
 
@@ -98,7 +94,6 @@ if menu == "👥 Gestión de Abonados":
             else:
                 pagos_abonado = []
 
-            # CORRECCIÓN: comparación en minúsculas
             if mes_anterior and any(mes_anterior.lower() == pago.lower() for pago in pagos_abonado):
                 estados[abonado_id] = "al día"
             elif mes_anterior:
@@ -184,6 +179,7 @@ if menu == "👥 Gestión de Abonados":
                     if st.button("🗑️ Eliminar", key=f"del_{pago['id']}"):
                         supabase.table("pagos").delete().eq("id", pago["id"]).execute()
                         st.success("Pago eliminado. Recarga para ver los cambios.")
+
 
 # ---------- PESTAÑA: PAGOS ----------
 if menu == "💵 Pagos":
