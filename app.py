@@ -98,7 +98,8 @@ if menu == "👥 Gestión de Abonados":
             else:
                 pagos_abonado = []
 
-            if mes_anterior and mes_anterior in pagos_abonado:
+            # CORRECCIÓN: comparación en minúsculas
+            if mes_anterior and any(mes_anterior.lower() == pago.lower() for pago in pagos_abonado):
                 estados[abonado_id] = "al día"
             elif mes_anterior:
                 estados[abonado_id] = "moroso"
