@@ -323,6 +323,7 @@ if menu == "📤 Respaldo":
         with col2:
             hasta = st.date_input("📅 Hasta:", value=fecha_max, min_value=fecha_min, max_value=fecha_max)
 
+        # Filtrar por rango de fecha
         mask = (df_abonados["creado_en"].dt.date >= desde) & (df_abonados["creado_en"].dt.date <= hasta)
         df_abonados_filtrado = df_abonados[mask].copy()
 
@@ -335,7 +336,7 @@ if menu == "📤 Respaldo":
 
         df_abonados_filtrado["Registrado El"] = df_abonados_filtrado["Registrado El"].dt.strftime("%d/%m/%Y")
 
-        # Agrupar pagos por abonado sin duplicados
+        # Agrupar pagos por abonado y eliminar duplicados
         df_pagos_df = pd.DataFrame(pagos)
         pagos_por_abonado = (
             df_pagos_df.groupby("abonado_id")["mes_pagado"]
@@ -343,7 +344,12 @@ if menu == "📤 Respaldo":
             .to_dict()
         )
 
-        df_abonados_filtrado["Meses Pagados"] = df_abonados_filtrado["id"].map(pagos_por_abonado).fillna("")
+        # Asignar meses pagados solo si tiene pagos
+        df_abonados_filtrado["Meses Pagados"] = df_abonados_filtrado["id"].map(pagos_por_abonado)
+
+        # Mantener solo abonados que tienen pagos
+        df_abonados_filtrado = df_abonados_filtrado[df_abonados_filtrado["Meses Pagados"].notna()]
+
         df_abonados_filtrado.drop(columns=["id"], inplace=True)
 
         df_pagos.rename(columns={
