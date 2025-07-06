@@ -69,7 +69,7 @@ if menu == "👥 Gestión de Abonados":
     else:
         df_abonados = pd.DataFrame(abonados_data.data)
 
-        # Obtener mes anterior al actual (solo si aplica)
+        # Calcular mes anterior si ya aplica
         meses_inicio = ["Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
         año_inicio = 2025
         hoy = date.today()
@@ -80,16 +80,13 @@ if menu == "👥 Gestión de Abonados":
             if hoy.month == 1:
                 mes_anterior = f"Diciembre {hoy.year - 1}"
             else:
-                # Si usas meses en español, ajusta aquí también
                 meses_es = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
                 mes_anterior = f"{meses_es[hoy.month - 2]} {hoy.year}"
 
-        # Consultar pagos
         pagos = supabase.table("pagos").select("abonado_id", "mes_pagado").execute().data
         df_pagos = pd.DataFrame(pagos)
 
-        # Calcular estado
         estados = {}
         for _, row in df_abonados.iterrows():
             abonado_id = row["id"]
@@ -132,8 +129,7 @@ if menu == "👥 Gestión de Abonados":
                     "nombre_completo": nuevo_nombre
                 }).eq("id", seleccionado_id).execute()
                 if update.data:
-                    st.success("✅ Abonado actualizado.")
-                    st.experimental_rerun()
+                    st.success("✅ Abonado actualizado. Vuelve a seleccionarlo para ver los cambios.")
                 else:
                     st.error("❌ No se pudieron guardar los cambios.")
 
@@ -142,8 +138,7 @@ if menu == "👥 Gestión de Abonados":
                 confirm = st.confirm("¿Estás seguro de eliminar este abonado? Esta acción no se puede deshacer.")
                 if confirm:
                     supabase.table("abonados").delete().eq("id", seleccionado_id).execute()
-                    st.success("✅ Abonado eliminado.")
-                    st.experimental_rerun()
+                    st.success("✅ Abonado eliminado. Cambia de pestaña para actualizar la lista.")
 
         # ---------- GESTIÓN DE PAGOS DEL ABONADO ----------
         st.write("### Pagos registrados de este abonado")
@@ -153,7 +148,14 @@ if menu == "👥 Gestión de Abonados":
         if not pagos_abonado:
             st.info("Este abonado aún no tiene pagos registrados.")
         else:
-            for pago in pagos_abonado:
+            df_pagos_abonado = pd.DataFrame(pagos_abonado)
+            meses_unicos = sorted(df_pagos_abonado["mes_pagado"].unique().tolist())
+            mes_filtro = st.selectbox("🔎 Filtrar por mes pagado", options=["Todos los meses"] + meses_unicos)
+
+            if mes_filtro != "Todos los meses":
+                df_pagos_abonado = df_pagos_abonado[df_pagos_abonado["mes_pagado"] == mes_filtro]
+
+            for _, pago in df_pagos_abonado.iterrows():
                 col1, col2, col3 = st.columns([3, 3, 1])
                 with col1:
                     st.write(f"🗓️ Mes pagado: **{pago['mes_pagado']}**")
@@ -165,14 +167,15 @@ if menu == "👥 Gestión de Abonados":
                         key=f"f{pago['id']}"
                     )
                     if st.button("💾 Guardar cambio de fecha", key=f"edit_{pago['id']}"):
-                        supabase.table("pagos").update({"fecha_pago": nueva_fecha.isoformat()}).eq("id", pago["id"]).execute()
-                        st.success("Fecha actualizada correctamente.")
-                        st.experimental_rerun()
+                        resultado = supabase.table("pagos").update({"fecha_pago": nueva_fecha.isoformat()}).eq("id", pago["id"]).execute()
+                        if resultado.data:
+                            st.success("Fecha actualizada correctamente. Recarga para ver el cambio.")
+                        else:
+                            st.error("❌ No se pudo actualizar.")
                 with col3:
                     if st.button("🗑️ Eliminar", key=f"del_{pago['id']}"):
                         supabase.table("pagos").delete().eq("id", pago["id"]).execute()
-                        st.success("Pago eliminado.")
-                        st.experimental_rerun()
+                        st.success("Pago eliminado. Recarga para ver los cambios.")
 
 # ---------- PESTAÑA: PAGOS ----------
 if menu == "💵 Pagos":
