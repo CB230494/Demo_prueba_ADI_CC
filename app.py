@@ -149,19 +149,18 @@ if menu == "💵 Pagos":
         abonado_seleccionado = st.selectbox("Selecciona un abonado", list(abonado_dict.keys()))
         id_abonado = abonado_dict[abonado_seleccionado]
 
-        # ----------- NUEVA LÓGICA DE MESES DISPONIBLES -----------
+        # --------- MESES EN ESPAÑOL ---------
+        meses_es = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
         año_actual = date.today().year
-        todos_los_meses = [f"{month_name[i]} {año_actual}" for i in range(1, 13)]
+        todos_los_meses = [f"{mes} {año_actual}" for mes in meses_es]
 
+        # Obtener meses ya pagados por este abonado
         pagos_existentes = supabase.table("pagos").select("mes_pagado").eq("abonado_id", id_abonado).execute().data
         meses_ya_pagados = [p["mes_pagado"] for p in pagos_existentes]
         meses_disponibles = [m for m in todos_los_meses if m not in meses_ya_pagados]
 
-        meses_seleccionados = st.multiselect(
-            "Selecciona el/los meses a pagar",
-            options=meses_disponibles
-        )
-
+        meses_seleccionados = st.multiselect("Selecciona el/los meses a pagar", options=meses_disponibles)
         fecha_pago = st.date_input("Fecha de pago", value=date.today())
         imagen = st.file_uploader("Pantallazo del SINPE (imagen JPG o PNG)", type=["png", "jpg", "jpeg"])
 
@@ -169,7 +168,6 @@ if menu == "💵 Pagos":
             if not meses_seleccionados or not imagen:
                 st.warning("Debes seleccionar al menos un mes y subir el comprobante.")
             else:
-                # Registrar cada mes como pago individual
                 for mes in meses_seleccionados:
                     supabase.table("pagos").insert({
                         "abonado_id": id_abonado,
@@ -257,6 +255,7 @@ if menu == "💵 Pagos":
                     file_name=f"factura_{abonado_seleccionado.replace(' ', '_')}.pdf",
                     mime="application/pdf"
                 )
+
 # ---------- PESTAÑA: RESPALDO ----------
 if menu == "📤 Respaldo":
     st.subheader("📦 Descargar respaldo en Excel")
